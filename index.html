@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>光伏逆变器功率计算器 V6</title>
+  <!-- SheetJS for xlsx import/export -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+      background: #F0F0EE; color: #2C2C2A; min-height: 100vh;
+      display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px;
+    }
+    .app { width: 100%; max-width: 720px; }
+    .card {
+      background: #fff; border-radius: 14px; border: 0.5px solid rgba(0,0,0,0.10);
+      padding: 24px 28px; margin-bottom: 14px;
+    }
+    /* 顶部角色栏 */
+    .role-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #fff; border-radius: 10px; border: 0.5px solid rgba(0,0,0,0.10);
+      padding: 10px 18px; margin-bottom: 12px;
+    }
+    .role-info { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #5F5E5A; }
+    .role-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 20px;
+    }
+    .role-badge.admin { background: #FFF3E0; color: #C75B00; border: 0.5px solid #F5C98C; }
+    .role-badge.user  { background: #E8F5E9; color: #2E7D32; border: 0.5px solid #A5D6A7; }
+    .role-btn {
+      font-size: 11px; padding: 5px 12px; border: 0.5px solid rgba(0,0,0,0.15);
+      border-radius: 5px; background: #fff; color: #5F5E5A; cursor: pointer;
+    }
+    .role-btn:hover { background: #F0F0EE; }
+    .role-btn.logout { color: #D84040; border-color: rgba(216,64,64,0.25); }
+    /* 登录弹窗 */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+      z-index: 1000; align-items: center; justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: #fff; border-radius: 14px; padding: 28px 30px; width: 320px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.18); position: relative;
+    }
+    .modal h3 { font-size: 16px; font-weight: 500; margin-bottom: 6px; }
+    .modal p { font-size: 12px; color: #888780; margin-bottom: 16px; }
+    .modal input {
+      width: 100%; padding: 9px 12px; font-size: 13px; border: 0.5px solid rgba(0,0,0,0.18);
+      border-radius: 7px; outline: none; margin-bottom: 12px;
+    }
+    .modal input:focus { border-color: #185FA5; }
+    .modal-err { font-size: 11px; color: #D84040; margin-bottom: 8px; min-height: 16px; }
+    .modal-btns { display: flex; gap: 8px; }
+    .modal-btns button { flex: 1; padding: 9px; border-radius: 7px; font-size: 13px; cursor: pointer; border: none; }
+    .btn-primary { background: #185FA5; color: #fff; font-weight: 500; }
+    .btn-primary:hover { background: #378ADD; }
+    .btn-secondary { background: #F0F0EE; color: #5F5E5A; }
+    .btn-secondary:hover { background: #E4E4E1; }
+
+    /* 同步状态条 */
+    .sync-bar {
+      display: none; align-items: center; gap: 6px;
+      font-size: 11px; color: #888780; padding: 6px 12px;
+      background: #FAFAF8; border-radius: 7px; margin-bottom: 10px;
+    }
+    .sync-bar.show { display: flex; }
+    .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #B4B2A9; flex-shrink: 0; }
+    .sync-dot.ok { background: #4CAF50; }
+    .sync-dot.err { background: #D84040; }
+    .sync-dot.loading { background: #FFA726; animation: blink 0.8s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* GitHub Gist 设置 */
+    .gist-setup {
+      background: #F6F8FA; border: 0.5px solid #D0D7DE; border-radius: 8px;
+      padding: 12px 16px; margin-bottom: 12px; font-size: 12px; color: #24292F;
+    }
+    .gist-setup strong { color: #0969DA; }
+    .gist-setup input {
+      width: 100%; padding: 6px 10px; font-size: 12px; border: 0.5px solid rgba(0,0,0,0.18);
+      border-radius: 5px; outline: none; margin-top: 4px; margin-bottom: 6px;
+      color: #2C2C2A; background: #fff;
+    }
+    .gist-setup .hint { font-size: 10px; color: #5F5E5A; margin-top: 4px; line-height: 1.5; }
+    .gist-setup label { font-weight: 500; display: block; margin-bottom: 2px; }
+    .gist-setup .row { display: flex; gap: 6px; align-items: center; }
+
+    .page-title { font-size: 18px; font-weight: 500; margin-bottom: 2px; }
+    .page-sub { font-size: 12px; color: #888780; margin-bottom: 20px; }
+    .sec-title { font-size: 13px; font-weight: 500; color: #444441; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 0.5px solid rgba(0,0,0,0.08); }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .row-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: 12px; color: #5F5E5A; }
+    .field input, .field select {
+      padding: 8px 10px; font-size: 13px; border: 0.5px solid rgba(0,0,0,0.18);
+      border-radius: 7px; background: #fff; color: #2C2C2A; width: 100%; outline: none;
+    }
+    .field input:focus, .field select:focus { border-color: #185FA5; }
+    .field input[readonly] { background: #F5F5F3; color: #185FA5; font-weight: 500; }
+    .calc-row { display: flex; align-items: flex-end; gap: 14px; margin-bottom: 12px; }
+    .calc-row .field { flex: 1; }
+    .calc-row .eq { font-size: 14px; color: #888780; padding-bottom: 6px; white-space: nowrap; }
+    .calc-btn {
+      width: 100%; padding: 12px; background: #185FA5; color: #fff; border: none;
+      border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;
+      margin: 6px 0 18px; transition: background 0.15s;
+    }
+    .calc-btn:hover { background: #378ADD; }
+
+    /* 相位选择器 */
+    .phase-selector { display: flex; gap: 10px; margin-bottom: 16px; }
+    .phase-option {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border: 1.5px solid rgba(0,0,0,0.12); border-radius: 8px;
+      cursor: pointer; transition: all 0.2s; user-select: none; flex: 1; justify-content: center;
+    }
+    .phase-option:hover { border-color: #A8C8FA; background: #FAFCFF; }
+    .phase-option.active { border-color: #185FA5; background: #EEF4FF; }
+    .phase-radio {
+      width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.25);
+      display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;
+    }
+    .phase-option.active .phase-radio {
+      border-color: #185FA5; background: #185FA5;
+      box-shadow: inset 0 0 0 3px #EEF4FF;
+    }
+    .phase-label { font-size: 13px; font-weight: 500; color: #2C2C2A; }
+
+    /* 返回按钮 */
+    .back-bar {
+      display: flex; align-items: center; margin: -24px -28px 18px; padding: 12px 20px;
+      background: linear-gradient(135deg, #185FA5 0%, #378ADD 100%);
+      border-radius: 14px 14px 0 0;
+    }
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 15px; font-weight: 500; color: #fff; background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3); border-radius: 8px;
+      cursor: pointer; padding: 8px 18px; transition: all 0.2s;
+    }
+    .back-btn:hover { background: rgba(255,255,255,0.28); color: #fff; text-decoration: none; }
+    .back-btn .arrow-icon { font-size: 18px; line-height: 1; }
+
+    /* 结果页面 */
+    .result-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+    .result-grid.col2 { grid-template-columns: 1fr 1fr; }
+    .metric {
+      background: #F5F5F3; border-radius: 10px; padding: 13px 14px; text-align: center;
+    }
+    .metric .mlabel { font-size: 11px; color: #888780; margin-bottom: 6px; }
+    .metric .mvalue { font-size: 22px; font-weight: 500; color: #2C2C2A; line-height: 1.2; word-break: break-all; }
+    .metric .munit { font-size: 11px; color: #888780; margin-top: 3px; }
+    .metric.primary { background: #E6F1FB; }
+    .metric.primary .mvalue { color: #185FA5; }
+    .metric.optimal { background: #E8F5E9; }
+    .metric.optimal .mvalue { color: #2E7D32; }
+    .combo-box {
+      background: #FAFAF8; border-radius: 8px; padding: 10px 14px;
+      font-size: 13px; color: #444441; line-height: 1.7; margin-bottom: 12px;
+    }
+    .combo-box strong { color: #185FA5; }
+    hr { border: none; border-top: 0.5px solid rgba(0,0,0,0.08); margin: 16px 0; }
+
+    /* P功率双列展示 */
+    .power-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .power-item {
+      background: #F5F5F3; border-radius: 10px; padding: 12px 14px; text-align: center;
+    }
+    .power-item .plabel { font-size: 11px; color: #888780; margin-bottom: 4px; }
+    .power-item .pvalue { font-size: 24px; font-weight: 500; color: #2C2C2A; }
+    .power-item .punit { font-size: 11px; color: #888780; margin-top: 2px; }
+
+    /* 管理员配置面板 */
+    .admin-toggle {
+      display: flex; align-items: center; gap: 6px; font-size: 12px; color: #B4B2A9;
+      cursor: pointer; user-select: none; padding: 6px 0; margin-bottom: 4px;
+    }
+    .admin-toggle:hover { color: #5F5E5A; }
+    .admin-toggle .arrow { transition: transform 0.2s; font-size: 10px; }
+    .admin-toggle.open .arrow { transform: rotate(90deg); }
+    .admin-panel { display: none; }
+    .admin-panel.show { display: block; }
+
+    .config-section { margin-bottom: 16px; }
+    .config-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 4px; }
+    .config-header span { font-size: 12px; font-weight: 500; color: #5F5E5A; }
+    .btn-group { display: flex; gap: 4px; flex-wrap: wrap; }
+    .btn-sm {
+      font-size: 11px; padding: 4px 10px; border: 0.5px solid rgba(0,0,0,0.15);
+      border-radius: 5px; background: #fff; color: #5F5E5A; cursor: pointer; white-space: nowrap;
+    }
+    .btn-sm:hover { background: #F0F0EE; }
+    .btn-sm.btn-add { background: #E6F1FB; color: #185FA5; border-color: #B5D5F0; }
+    .btn-sm.btn-add:hover { background: #D0E6F8; }
+    .btn-sm.btn-update { background: #FFF8E1; color: #C75B00; border-color: #F5C98C; }
+    .btn-sm.btn-update:hover { background: #FFF3CD; }
+    .btn-sm.btn-overwrite { background: #FDECEC; color: #D84040; border-color: rgba(216,64,64,0.25); }
+    .btn-sm.btn-overwrite:hover { background: #FADBD8; }
+    .btn-sm.btn-confirm { background: #185FA5; color: #fff; border-color: #185FA5; }
+    .btn-sm.btn-confirm:hover { background: #378ADD; }
+    .btn-sm.btn-cancel { color: #A6A49F; }
+    .btn-sm.btn-del { color: #D84040; border-color: rgba(216,64,64,0.25); padding: 2px 7px; font-size: 13px; line-height: 1; }
+    .btn-sm.btn-del:hover { background: #FDECEC; }
+    .btn-sm.btn-sync { background: #E8F5E9; color: #2E7D32; border-color: #A5D6A7; }
+    .btn-sm.btn-sync:hover { background: #C8E6C9; }
+    .config-table-wrap { max-height: 200px; overflow-y: auto; border: 0.5px solid rgba(0,0,0,0.10); border-radius: 6px; }
+    .config-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .config-table th { background: #F5F5F3; padding: 5px 8px; text-align: left; font-weight: 500; color: #5F5E5A; position: sticky; top: 0; }
+    .config-table td { padding: 4px 8px; border-top: 0.5px solid rgba(0,0,0,0.05); color: #444441; }
+    .config-table .action-col { width: 28px; text-align: center; padding: 2px 2px; }
+    .config-table th.action-col { width: 28px; }
+    .add-row-wrap {
+      background: #FAFAF8; padding: 10px 12px; border-bottom: 0.5px solid rgba(0,0,0,0.10);
+      display: none; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .add-row-wrap.show { display: flex; }
+    .add-row-wrap input {
+      padding: 5px 7px; font-size: 11px; border: 0.5px solid rgba(0,0,0,0.18);
+      border-radius: 4px; background: #fff; color: #2C2C2A; outline: none; min-width: 60px;
+    }
+    .add-row-wrap input:focus { border-color: #185FA5; }
+    .add-row-wrap input.wide { min-width: 80px; }
+    .add-row-wrap input.narrow { max-width: 56px; }
+
+    /* 全局保存按钮 */
+    .save-all-btn {
+      width: 100%; padding: 10px; background: #2E7D32; color: #fff; border: none;
+      border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer;
+      margin-top: 8px; transition: background 0.15s;
+    }
+    .save-all-btn:hover { background: #388E3C; }
+    .save-all-btn:disabled { background: #A5D6A7; cursor: not-allowed; }
+
+    .footer { text-align: center; font-size: 11px; color: #B4B2A9; margin-top: 8px; }
+    @media (max-width: 560px) {
+      .card { padding: 18px 14px; }
+      .row-2, .row-4 { grid-template-columns: 1fr; }
+      .result-grid { grid-template-columns: 1fr 1fr; }
+      .result-grid.col2 { grid-template-columns: 1fr 1fr; }
+      .power-row { grid-template-columns: 1fr; }
+      .calc-row { flex-direction: column; gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 登录弹窗 -->
+<div class="modal-overlay" id="loginModal">
+  <div class="modal">
+    <h3>🔑 管理员登录</h3>
+    <p>请输入管理员密码以进入管理员模式</p>
+    <input type="password" id="loginPwd" placeholder="请输入密码" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="modal-err" id="loginErr"></div>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeLogin()">取消</button>
+      <button class="btn-primary" onclick="doLogin()">登录</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- 角色栏 -->
+  <div class="role-bar">
+    <div class="role-info">
+      <span id="roleLabel">当前角色：</span>
+      <span class="role-badge user" id="roleBadge">👤 普通用户</span>
+    </div>
+    <button class="role-btn" id="roleBtn" onclick="toggleRole()">切换到管理员</button>
+  </div>
+
+  <!-- 同步状态 -->
+  <div class="sync-bar" id="syncBar">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncMsg">等待同步...</span>
+  </div>
+
+  <!-- 输入卡片（默认显示） -->
+  <div class="card" id="inputCard">
+    <p class="page-title">光伏逆变器功率计算器</p>
+    <p class="page-sub">根据直流侧功率与地区容配比，自动匹配逆变器型号和组合方案</p>
+
+    <!-- 管理员配置面板（仅管理员可见） -->
+    <div id="adminSection" style="display:none;">
+      <div class="admin-toggle" onclick="toggleAdmin()" id="adminToggle">
+        <span class="arrow">▶</span> 管理员配置（在线增删 / 导入导出 / 云端同步）
+      </div>
+      <div class="admin-panel" id="adminPanel">
+
+        <!-- GitHub Gist 云端同步设置 -->
+        <div class="gist-setup" id="gistSetup">
+          <strong>☁️ 云端同步设置（GitHub Gist）</strong>
+          <p style="margin-top:4px;margin-bottom:0;font-size:11px;">配置修改后点「保存并同步」即可实时生效，所有设备自动拉取最新配置。无需 SDK、无条件限制。</p>
+          <div style="margin-top:8px;">
+            <label>GitHub Token（管理员写入用）</label>
+            <input type="password" id="gistToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" oninput="saveGistSettings()">
+          </div>
+          <div>
+            <label>Gist ID</label>
+            <div class="row">
+              <input type="text" id="gistId" placeholder="自动生成或手动粘贴" style="flex:1;" oninput="saveGistSettings()">
+              <button class="btn-sm btn-sync" onclick="createNewGist()" style="white-space:nowrap;">创建Gist</button>
+            </div>
+          </div>
+          <div class="hint" style="margin-top:6px;font-size:10px;line-height:1.6;">
+            📋 <strong>首次配置 2 步走：</strong><br>
+            ① <a href="https://github.com/settings/tokens/new?scopes=gist&description=pv-inverter-config" target="_blank">创建 GitHub Token</a> → Expiration 选「No expiration」→ 勾选 <code>gist</code> 权限 → 生成后粘贴到上方<br>
+            ② 点击「<strong>创建Gist</strong>」自动生成 Gist ID<br>
+            ⚡ 用户端无需任何配置，打开页面即自动加载云端数据。
+          </div>
+        </div>
+
+        <!-- 配置1: 组件功率 -->
+        <div class="config-section">
+          <div class="config-header">
+            <span>组件功率配置表 (W)</span>
+            <div class="btn-group">
+              <button class="btn-sm btn-add" onclick="showAddForm('panel')">+ 新增</button>
+              <button class="btn-sm btn-overwrite" onclick="importXlsxOverwrite('panel')" title="完全以导入表格内容覆盖当前数据">导入xlsx</button>
+              <button class="btn-sm btn-update" onclick="importXlsxUpdate('panel')" title="相同内容覆盖，新内容新增">更新xlsx</button>
+              <button class="btn-sm" onclick="exportXlsx('panel')">导出xlsx</button>
+            </div>
+          </div>
+          <div class="add-row-wrap" id="addForm-panel">
+            <input type="number" id="add-panel-watt" placeholder="组件功率(W)" min="1" class="narrow">
+            <button class="btn-sm btn-confirm" onclick="addRow('panel')">确认</button>
+            <button class="btn-sm btn-cancel" onclick="cancelAdd('panel')">取消</button>
+          </div>
+          <div class="config-table-wrap"><table class="config-table"><thead><tr><th>序号</th><th>组件功率(W)</th><th class="action-col"></th></tr></thead><tbody id="panelTb"></tbody></table></div>
+        </div>
+
+        <!-- 配置2: 地区容配比 -->
+        <div class="config-section">
+          <div class="config-header">
+            <span>地区容配比配置表</span>
+            <div class="btn-group">
+              <button class="btn-sm btn-add" onclick="showAddForm('location')">+ 新增</button>
+              <button class="btn-sm btn-overwrite" onclick="importXlsxOverwrite('location')" title="完全以导入表格内容覆盖当前数据">导入xlsx</button>
+              <button class="btn-sm btn-update" onclick="importXlsxUpdate('location')" title="相同内容覆盖，新内容新增">更新xlsx</button>
+              <button class="btn-sm" onclick="exportXlsx('location')">导出xlsx</button>
+            </div>
+          </div>
+          <div class="add-row-wrap" id="addForm-location">
+            <input type="text" id="add-loc-p" placeholder="省" class="wide">
+            <input type="text" id="add-loc-c" placeholder="市">
+            <input type="text" id="add-loc-d" placeholder="区县">
+            <input type="text" id="add-loc-t" placeholder="乡镇">
+            <input type="number" id="add-loc-r" placeholder="容配比" step="0.01" class="narrow">
+            <button class="btn-sm btn-confirm" onclick="addRow('location')">确认</button>
+            <button class="btn-sm btn-cancel" onclick="cancelAdd('location')">取消</button>
+          </div>
+          <div class="config-table-wrap"><table class="config-table"><thead><tr><th>省</th><th>市</th><th>区县</th><th>乡镇</th><th>容配比上限</th><th class="action-col"></th></tr></thead><tbody id="locTb"></tbody></table></div>
+        </div>
+
+        <!-- 配置3: 逆变器型号库 -->
+        <div class="config-section">
+          <div class="config-header">
+            <span>逆变器型号库</span>
+            <div class="btn-group">
+              <button class="btn-sm btn-add" onclick="showAddForm('inverter')">+ 新增</button>
+              <button class="btn-sm btn-overwrite" onclick="importXlsxOverwrite('inverter')" title="完全以导入表格内容覆盖当前数据">导入xlsx</button>
+              <button class="btn-sm btn-update" onclick="importXlsxUpdate('inverter')" title="相同内容覆盖，新内容新增">更新xlsx</button>
+              <button class="btn-sm" onclick="exportXlsx('inverter')">导出xlsx</button>
+            </div>
+          </div>
+          <div class="add-row-wrap" id="addForm-inverter">
+            <input type="text" id="add-inv-model" placeholder="型号名称" class="wide">
+            <input type="number" id="add-inv-power" placeholder="额定功率(kW)" min="1" class="narrow">
+            <select id="add-inv-phase" class="narrow"><option value="single">单相</option><option value="three">三相</option></select>
+            <button class="btn-sm btn-confirm" onclick="addRow('inverter')">确认</button>
+            <button class="btn-sm btn-cancel" onclick="cancelAdd('inverter')">取消</button>
+          </div>
+          <div class="config-table-wrap"><table class="config-table"><thead><tr><th>型号名称</th><th>额定功率(kW)</th><th>相数</th><th class="action-col"></th></tr></thead><tbody id="invTb"></tbody></table></div>
+        </div>
+
+        <!-- 配置4: 逆变器选型规则 -->
+        <div class="config-section">
+          <div class="config-header">
+            <span>逆变器选型规则表</span>
+            <div class="btn-group">
+              <button class="btn-sm btn-add" onclick="showAddForm('rules')">+ 新增</button>
+              <button class="btn-sm btn-overwrite" onclick="importXlsxOverwrite('rules')" title="完全以导入表格内容覆盖当前数据">导入xlsx</button>
+              <button class="btn-sm btn-update" onclick="importXlsxUpdate('rules')" title="相同内容覆盖，新内容新增">更新xlsx</button>
+              <button class="btn-sm" onclick="exportXlsx('rules')">导出xlsx</button>
+            </div>
+          </div>
+          <div class="add-row-wrap" id="addForm-rules">
+            <input type="number" id="add-rules-pmin" placeholder="P下限" min="0" class="narrow">
+            <input type="number" id="add-rules-pmax" placeholder="P上限" min="0" class="narrow">
+            <input type="number" id="add-rules-max" placeholder="总功率(kW)" min="0" class="narrow">
+            <input type="number" id="add-rules-rec" placeholder="备案容量(kW)" min="0" class="narrow">
+            <input type="text" id="add-rules-combo" placeholder="建议组合">
+            <button class="btn-sm btn-confirm" onclick="addRow('rules')">确认</button>
+            <button class="btn-sm btn-cancel" onclick="cancelAdd('rules')">取消</button>
+          </div>
+          <div class="config-table-wrap"><table class="config-table"><thead><tr><th>P（交流侧）范围</th><th>逆变器总功率</th><th>建议备案容量</th><th>建议组合</th><th class="action-col"></th></tr></thead><tbody id="rulesTb"></tbody></table></div>
+        </div>
+
+        <button class="save-all-btn" id="saveAllBtn" onclick="saveToCloud()">☁️ 保存并同步到云端（所有设备生效）</button>
+      </div>
+    </div>
+
+    <!-- 相位选择 -->
+    <div class="sec-title">接入相数</div>
+    <div class="phase-selector">
+      <label class="phase-option" id="phaseSingle" onclick="selectPhase('single')">
+        <span class="phase-radio"></span>
+        <span class="phase-label">单相 220V</span>
+      </label>
+      <label class="phase-option active" id="phaseThree" onclick="selectPhase('three')">
+        <span class="phase-radio"></span>
+        <span class="phase-label">三相 380V</span>
+      </label>
+    </div>
+
+    <!-- 输入区 -->
+    <div class="sec-title">直流侧功率 P(直流侧)</div>
+    <div class="row-2">
+      <div class="field">
+        <label>组件功率 (W)</label>
+        <select id="panelPower" onchange="calcDCPower()"></select>
+      </div>
+      <div class="field">
+        <label>组件数量 (块)</label>
+        <input type="number" id="panelCount" value="20" min="1" step="1" oninput="calcDCPower()">
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:6px;">
+      <label>P(直流侧) 自动计算 (kWp)</label>
+      <input type="text" id="dcPower" value="11.00" readonly>
+    </div>
+
+    <div class="sec-title">地区选择与容配比</div>
+    <div class="row-4">
+      <div class="field"><label>省</label>
+        <select id="province" onchange="onProvinceChange()"><option value="">不选</option></select>
+      </div>
+      <div class="field"><label>市</label>
+        <select id="city" onchange="onCityChange()"><option value="">不选</option></select>
+      </div>
+      <div class="field"><label>区县</label>
+        <select id="district" onchange="onDistrictChange()"><option value="">不选</option></select>
+      </div>
+      <div class="field"><label>乡镇</label>
+        <select id="town" onchange="onTownChange()"><option value="">不选</option></select>
+      </div>
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <label>执行容配比</label>
+        <input type="number" id="capacityRatio" value="1.20" min="0.5" max="3.0" step="0.01" oninput="calcACPower()">
+      </div>
+      <div class="field">
+        <label>来源</label>
+        <input type="text" id="ratioSource" value="手动输入" readonly style="color:#888780;font-weight:400;">
+      </div>
+    </div>
+
+    <div class="sec-title">交流侧功率 P(交流侧)</div>
+    <div class="calc-row">
+      <div class="field">
+        <label>P(交流侧) (kW)</label>
+        <input type="text" id="acPower" value="—" readonly>
+      </div>
+      <div class="eq">=</div>
+      <div class="field">
+        <label>P(直流侧) / 执行容配比</label>
+        <input type="text" id="acFormula" value="11.00 / 1.20" readonly style="color:#888780;font-weight:400;">
+      </div>
+    </div>
+
+    <button class="calc-btn" onclick="calculateInverter()">输出逆变器型号和组合</button>
+  </div>
+
+  <!-- 结果卡片（计算后显示） -->
+  <div class="card" id="resultCard" style="display:none;">
+    <div class="back-bar">
+      <button class="back-btn" onclick="goBackToInput()"><span class="arrow-icon">&#8592;</span> 返回修改</button>
+    </div>
+    <p class="page-title">计算结果</p>
+
+    <!-- P 功率展示 -->
+    <div class="power-row">
+      <div class="power-item">
+        <div class="plabel">P（直流侧）</div>
+        <div class="pvalue" id="rp-dcPower">—</div>
+        <div class="punit">kWp</div>
+      </div>
+      <div class="power-item">
+        <div class="plabel">P（交流侧）</div>
+        <div class="pvalue" id="rp-acPower">—</div>
+        <div class="punit">kW</div>
+      </div>
+    </div>
+
+    <!-- 规则匹配结果（三相时显示，单相时隐藏） -->
+    <div id="ruleMatchSection">
+    <div class="sec-title">规则匹配结果</div>
+    <div class="result-grid">
+      <div class="metric">
+        <div class="mlabel">最大允许逆变器总功率</div>
+        <div class="mvalue" id="r-maxInv">—</div>
+        <div class="munit">kW</div>
+      </div>
+      <div class="metric primary">
+        <div class="mlabel">可备案容量</div>
+        <div class="mvalue" id="r-recCap">—</div>
+        <div class="munit">kW</div>
+      </div>
+      <div class="metric primary">
+        <div class="mlabel">可备案逆变器组合</div>
+        <div class="mvalue" id="r-recCombo">—</div>
+        <div class="munit"></div>
+      </div>
+    </div>
+    </div><!-- /ruleMatchSection -->
+
+    <!-- 最优匹配结果 -->
+    <div class="sec-title">最优匹配结果</div>
+    <div class="result-grid col2">
+      <div class="metric optimal">
+        <div class="mlabel">最优备案容量</div>
+        <div class="mvalue" id="r-optCap">—</div>
+        <div class="munit">kW</div>
+      </div>
+      <div class="metric optimal">
+        <div class="mlabel">逆变器最优组合</div>
+        <div class="mvalue" id="r-optCombo">—</div>
+        <div class="munit"></div>
+      </div>
+    </div>
+
+    <div class="combo-box" id="optimalBox" style="display:none;">
+      <strong>最优逆变器方案</strong>（精确匹配型号库，多台排除10/15/20kW）<br>
+      <span id="optimalText"></span>
+    </div>
+  </div>
+
+  <p class="footer">V6 · 角色权限 · 覆盖/更新导入 · 独立结果页 · GitHub Gist云端同步</p>
+</div>
+
+<div style="display:none;">
+  <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFileImport(event)">
+</div>
+
+<script>
+// ============ 默认配置数据 ============
+const DEFAULT_PANELS = [270,280,285,300,315,320,330,340,350,380,390,400,405,410,430,445,450,460,470,500,530,545,550,580,600,660,700];
+const DEFAULT_LOCATIONS = [
+  { p: '浙江省', c: '杭州市', d: '', t: '', r: 1.20 },
+  { p: '浙江省', c: '宁波市', d: '', t: '', r: 1.20 },
+  { p: '浙江省', c: '杭州市', d: '余杭区', t: '', r: 1.15 },
+  { p: '浙江省', c: '杭州市', d: '余杭区', t: '仓前镇', r: 1.10 },
+  { p: '江苏省', c: '南京市', d: '', t: '', r: 1.25 },
+  { p: '江苏省', c: '苏州市', d: '', t: '', r: 1.25 },
+  { p: '江苏省', c: '南京市', d: '江宁区', t: '', r: 1.15 },
+  { p: '广东省', c: '广州市', d: '', t: '', r: 1.30 },
+  { p: '广东省', c: '深圳市', d: '', t: '', r: 1.30 },
+  { p: '山东省', c: '济南市', d: '', t: '', r: 1.20 },
+  { p: '河北省', c: '石家庄市', d: '', t: '', r: 1.15 },
+  { p: '河南省', c: '郑州市', d: '', t: '', r: 1.20 },
+  { p: '安徽省', c: '合肥市', d: '', t: '', r: 1.20 },
+  { p: '湖北省', c: '武汉市', d: '', t: '', r: 1.20 },
+  { p: '湖南省', c: '长沙市', d: '', t: '', r: 1.20 },
+  { p: '福建省', c: '福州市', d: '', t: '', r: 1.20 },
+  { p: '江西省', c: '南昌市', d: '', t: '', r: 1.20 },
+  { p: '四川省', c: '成都市', d: '', t: '', r: 1.20 },
+  { p: '陕西省', c: '西安市', d: '', t: '', r: 1.20 },
+  { p: '云南省', c: '昆明市', d: '', t: '', r: 1.25 },
+];
+const DEFAULT_INVERTERS = [
+  { model: '单相10kW', power: 10, phase: 'single' },
+  { model: '三相15kW', power: 15, phase: 'three' },
+  { model: '三相20kW', power: 20, phase: 'three' },
+  { model: '三相25kW', power: 25, phase: 'three' },
+  { model: '三相33kW', power: 33, phase: 'three' },
+  { model: '三相36kW', power: 36, phase: 'three' },
+  { model: '三相39kW', power: 39, phase: 'three' },
+  { model: '三相44kW', power: 44, phase: 'three' },
+  { model: '三相50kW', power: 50, phase: 'three' },
+  { model: '三相55kW', power: 55, phase: 'three' },
+];
+const DEFAULT_RULES = (function() {
+  const left = [
+    [0,10,10,10,'10'],[0,15,15,15,'15'],[15,20,20,20,'20'],[20,27,27,27,'27'],
+    [27,33,33,33,'33'],[33,36,36,36,'36'],[36,39,39,39,'39'],[39,44,44,44,'44'],
+    [44,50,50,50,'50'],[50,55,55,55,'55'],[55,60,65,60,'27+33'],[60,65,70,66,'33+33'],
+    [65,70,75,71,'27+44'],[70,75,80,75,'36+39'],[75,80,85,80,'36+44'],[80,85,90,86,'36+50'],
+    [85,90,95,91,'36+55'],[90,95,100,99,'44+55'],[95,100,105,100,'50+50'],[100,105,110,105,'50+55'],
+    [105,110,115,110,'55+55'],[110,115,120,115,'27+44+44'],[115,120,125,121,'33+44+44'],
+    [120,125,130,125,'36+39+50'],[125,130,135,130,'36+39+55'],[130,135,140,135,'36+44+55'],
+    [135,140,145,141,'36+50+55'],[140,145,150,146,'36+55+55'],[145,150,155,150,'50+50+50'],
+    [150,155,160,155,'50+50+55'],[155,160,165,160,'50+55+55'],[160,165,170,165,'55+55+55'],
+    [165,170,175,170,'27+44+44+55'],[170,175,180,175,'36+39+50+50'],[175,180,185,180,'36+44+50+50'],
+    [180,185,190,185,'36+44+50+55'],[185,190,195,190,'36+44+55+55'],[190,195,200,196,'36+50+55+55'],
+    [195,200,205,200,'50+50+50+50']
+  ];
+  const right = [];
+  for (let i = 200; i < 400; i += 5) right.push([i, i+5, i+5, i+5, '']);
+  return left.concat(right).map(r => ({ pMin: r[0], pMax: r[1], maxInvPower: r[2], recCapacity: r[3], combo: r[4] }));
+})();
+
+// ============ 状态 ============
+let panelConfig = [];
+let locationConfig = [];
+let inverterConfig = [];
+let rulesConfig = [];
+let isAdmin = false;
+let importTarget = '';
+let importMode = ''; // 'overwrite' or 'update'
+let selectedPhase = 'three'; // 'single' or 'three'
+const ADMIN_PWD = 'admin888';
+
+// ============ GitHub Gist 云同步 ============
+let gistReady = false;
+
+function getGistToken() { return localStorage.getItem('pv_gist_token') || ''; }
+function getGistId()    { return localStorage.getItem('pv_gist_id')  || ''; }
+
+function saveGistSettings() {
+  localStorage.setItem('pv_gist_token', document.getElementById('gistToken').value.trim());
+  localStorage.setItem('pv_gist_id',   document.getElementById('gistId').value.trim());
+}
+
+async function createNewGist() {
+  const token = document.getElementById('gistToken').value.trim();
+  if (!token) { alert('请先填写 GitHub Token'); return; }
+  setSyncStatus('loading', '正在创建 Gist...');
+  try {
+    const res = await fetch('https://api.github.com/gists', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        description: '光伏逆变器计算器配置 - 自动同步',
+        public: true,
+        files: { 'pv-config.json': { content: JSON.stringify(buildConfigPayload(), null, 2) } }
+      })
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'HTTP ' + res.status); }
+    const data = await res.json();
+    if (data.id) {
+      document.getElementById('gistId').value = data.id;
+      saveGistSettings();
+      gistReady = true;
+      setSyncStatus('ok', '✅ Gist 创建成功，ID 已自动填入');
+      alert('✅ Gist 创建成功！\nID: ' + data.id + '\n已自动填入，请点击「保存并同步」完成首次配置。');
+    } else {
+      throw new Error('响应中缺少 id');
+    }
+  } catch(e) {
+    setSyncStatus('err', '创建失败: ' + e.message);
+    alert('创建失败，请检查 Token 是否有 gist 权限。\n' + e.message);
+  }
+}
+
+function buildConfigPayload() {
+  return { panels: panelConfig, locations: locationConfig, inverters: inverterConfig, rules: rulesConfig, updatedAt: Date.now() };
+}
+
+async function saveToCloud() {
+  const token = getGistToken();
+  const id    = getGistId();
+  if (!token || !id) {
+    alert('请先在「云端同步设置」中填写 GitHub Token 和 Gist ID');
+    return;
+  }
+  const btn = document.getElementById('saveAllBtn');
+  btn.disabled = true; btn.textContent = '保存中...';
+  setSyncStatus('loading', '正在上传配置到 Gist...');
+  try {
+    const res = await fetch(`https://api.github.com/gists/${id}`, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        files: { 'pv-config.json': { content: JSON.stringify(buildConfigPayload(), null, 2) } }
+      })
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'HTTP ' + res.status); }
+    setSyncStatus('ok', '✅ 已同步到云端 · ' + new Date().toLocaleTimeString());
+    saveLocalCache();
+  } catch(e) {
+    setSyncStatus('err', '同步失败: ' + e.message);
+    alert('同步失败\n' + e.message + '\n\n请检查 Token 是否有效（未过期）且具备 gist 权限。');
+  }
+  btn.disabled = false; btn.textContent = '☁️ 保存并同步到云端（所有设备生效）';
+}
+
+async function loadFromCloud() {
+  const id = getGistId();
+  if (!id) { loadFromLocal(); return; }
+  setSyncStatus('loading', '正在从 Gist 加载配置...');
+  try {
+    const res = await fetch(`https://api.github.com/gists/${id}`);
+    if (!res.ok) {
+      if (res.status === 404) { loadFromLocal(); setSyncStatus('ok', 'Gist 未找到，使用默认数据'); return; }
+      throw new Error('HTTP ' + res.status);
+    }
+    const data = await res.json();
+    const file = data.files && data.files['pv-config.json'];
+    if (file && file.content) {
+      const cfg = JSON.parse(file.content);
+      if (cfg.panels && cfg.panels.length) panelConfig = cfg.panels;
+      if (cfg.locations && cfg.locations.length) locationConfig = cfg.locations;
+      if (cfg.inverters && cfg.inverters.length) inverterConfig = cfg.inverters;
+      if (cfg.rules && cfg.rules.length) rulesConfig = cfg.rules;
+      saveLocalCache();
+      setSyncStatus('ok', '✅ 已加载云端配置 · ' + new Date().toLocaleTimeString());
+      refreshAll();
+    } else {
+      loadFromLocal();
+      setSyncStatus('ok', 'Gist 暂无配置，使用默认数据（管理员可保存同步）');
+    }
+  } catch(e) {
+    console.error('Gist load error:', e);
+    setSyncStatus('err', '云端加载失败，使用本地缓存');
+    loadFromLocal();
+  }
+}
+
+function loadFromLocal() {
+  const saved = localStorage.getItem('pv_inverter_config_v6');
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      if (data.panels && data.panels.length) panelConfig = data.panels;
+      if (data.locations && data.locations.length) locationConfig = data.locations;
+      if (data.inverters && data.inverters.length) inverterConfig = data.inverters;
+      if (data.rules && data.rules.length) rulesConfig = data.rules;
+      if (panelConfig.length && inverterConfig.length) { refreshAll(); return; }
+    } catch(e) {}
+  }
+  useDefaults();
+}
+
+function useDefaults() {
+  panelConfig    = DEFAULT_PANELS.map((w,i) => ({ id: i+1, watt: w }));
+  locationConfig = DEFAULT_LOCATIONS.map((l,i) => ({ id: i+1, ...l }));
+  inverterConfig = DEFAULT_INVERTERS.map((m,i) => ({ id: i+1, ...m }));
+  rulesConfig    = DEFAULT_RULES.map((r,i) => ({ id: i+1, ...r }));
+  saveLocalCache();
+  refreshAll();
+}
+
+function saveLocalCache() {
+  localStorage.setItem('pv_inverter_config_v6', JSON.stringify(buildConfigPayload()));
+}
+
+// ============ 同步状态条 ============
+function setSyncStatus(state, msg) {
+  const bar = document.getElementById('syncBar');
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncMsg');
+  bar.className = 'sync-bar show';
+  dot.className = 'sync-dot ' + state;
+  txt.textContent = msg;
+}
+
+// ============ 角色系统 ============
+function toggleRole() {
+  if (isAdmin) {
+    isAdmin = false;
+    applyRole();
+  } else {
+    openLogin();
+  }
+}
+
+function openLogin() {
+  document.getElementById('loginPwd').value = '';
+  document.getElementById('loginErr').textContent = '';
+  document.getElementById('loginModal').classList.add('show');
+  setTimeout(() => document.getElementById('loginPwd').focus(), 100);
+}
+
+function closeLogin() {
+  document.getElementById('loginModal').classList.remove('show');
+}
+
+function doLogin() {
+  const pwd = document.getElementById('loginPwd').value;
+  if (pwd === ADMIN_PWD) {
+    isAdmin = true;
+    closeLogin();
+    applyRole();
+  } else {
+    document.getElementById('loginErr').textContent = '密码错误，请重试';
+  }
+}
+
+function applyRole() {
+  const badge   = document.getElementById('roleBadge');
+  const btn     = document.getElementById('roleBtn');
+  const adminSec = document.getElementById('adminSection');
+
+  if (isAdmin) {
+    badge.className = 'role-badge admin';
+    badge.textContent = '🔑 管理员';
+    btn.className = 'role-btn logout';
+    btn.textContent = '退出管理员';
+    adminSec.style.display = 'block';
+    document.getElementById('gistToken').value = getGistToken();
+    document.getElementById('gistId').value   = getGistId();
+  } else {
+    badge.className = 'role-badge user';
+    badge.textContent = '👤 普通用户';
+    btn.className = 'role-btn';
+    btn.textContent = '切换到管理员';
+    adminSec.style.display = 'none';
+    // 关闭配置面板
+    document.getElementById('adminPanel').classList.remove('show');
+    document.getElementById('adminToggle').classList.remove('open');
+  }
+}
+
+// ============ 页面导航 ============
+function showResultPage() {
+  document.getElementById('inputCard').style.display = 'none';
+  document.getElementById('resultCard').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function goBackToInput() {
+  document.getElementById('resultCard').style.display = 'none';
+  document.getElementById('inputCard').style.display = 'block';
+  document.getElementById('inputCard').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ============ 刷新所有 ============
+function refreshAll() {
+  refreshPanelTable();
+  refreshLocationTable();
+  refreshInverterTable();
+  refreshRulesTable();
+  refreshPanelDropdown();
+  refreshProvinceDropdown();
+  calcDCPower();
+}
+
+// ============ 表格渲染 ============
+function refreshPanelTable() {
+  document.getElementById('panelTb').innerHTML = panelConfig.length
+    ? panelConfig.map(p => `<tr><td>${p.id}</td><td>${p.watt}</td><td class="action-col"><button class="btn-sm btn-del" onclick="deleteRow('panel',${p.id})">×</button></td></tr>`).join('')
+    : '<tr><td colspan="3" style="color:#B4B2A9;text-align:center;padding:8px;">暂无数据</td></tr>';
+}
+function refreshLocationTable() {
+  document.getElementById('locTb').innerHTML = locationConfig.length
+    ? locationConfig.map(l => `<tr><td>${l.p||''}</td><td>${l.c||''}</td><td>${l.d||''}</td><td>${l.t||''}</td><td>${l.r}</td><td class="action-col"><button class="btn-sm btn-del" onclick="deleteRow('location',${l.id})">×</button></td></tr>`).join('')
+    : '<tr><td colspan="6" style="color:#B4B2A9;text-align:center;padding:8px;">暂无数据</td></tr>';
+}
+function refreshInverterTable() {
+  document.getElementById('invTb').innerHTML = inverterConfig.length
+    ? inverterConfig.map(m => `<tr><td>${m.model}</td><td>${m.power}</td><td>${m.phase==='single'?'单相':'三相'}</td><td class="action-col"><button class="btn-sm btn-del" onclick="deleteRow('inverter',${m.id})">×</button></td></tr>`).join('')
+    : '<tr><td colspan="4" style="color:#B4B2A9;text-align:center;padding:8px;">暂无数据</td></tr>';
+}
+function refreshRulesTable() {
+  document.getElementById('rulesTb').innerHTML = rulesConfig.length
+    ? rulesConfig.map(rr => `<tr><td>${rr.pMin}＜P≤${rr.pMax}</td><td>${rr.maxInvPower}</td><td>${rr.recCapacity}</td><td>${rr.combo||'—'}</td><td class="action-col"><button class="btn-sm btn-del" onclick="deleteRow('rules',${rr.id})">×</button></td></tr>`).join('')
+    : '<tr><td colspan="5" style="color:#B4B2A9;text-align:center;padding:8px;">暂无数据</td></tr>';
+}
+
+// ============ 下拉刷新 ============
+function refreshPanelDropdown() {
+  const sel = document.getElementById('panelPower');
+  sel.innerHTML = panelConfig.map(p => `<option value="${p.watt}">${p.watt}W</option>`).join('');
+  if (panelConfig.length > 0) sel.value = panelConfig[Math.floor(panelConfig.length/2)].watt;
+}
+function refreshProvinceDropdown() {
+  const provinces = [...new Set(locationConfig.map(l => l.p).filter(Boolean))].sort();
+  document.getElementById('province').innerHTML = '<option value="">不选</option>' + provinces.map(p => `<option value="${p}">${p}</option>`).join('');
+  document.getElementById('city').innerHTML = '<option value="">不选</option>';
+  document.getElementById('district').innerHTML = '<option value="">不选</option>';
+  document.getElementById('town').innerHTML = '<option value="">不选</option>';
+}
+
+// ============ 地区级联 ============
+function onProvinceChange() {
+  const p = document.getElementById('province').value;
+  const cities = p ? [...new Set(locationConfig.filter(l => l.p === p && l.c).map(l => l.c))].sort() : [];
+  document.getElementById('city').innerHTML = '<option value="">不选</option>' + cities.map(c => `<option value="${c}">${c}</option>`).join('');
+  onCityChange();
+}
+function onCityChange() {
+  const p = document.getElementById('province').value;
+  const c = document.getElementById('city').value;
+  const dists = (p && c) ? [...new Set(locationConfig.filter(l => l.p===p && l.c===c && l.d).map(l => l.d))].sort() : [];
+  document.getElementById('district').innerHTML = '<option value="">不选</option>' + dists.map(d => `<option value="${d}">${d}</option>`).join('');
+  onDistrictChange();
+}
+function onDistrictChange() {
+  const p = document.getElementById('province').value;
+  const c = document.getElementById('city').value;
+  const d = document.getElementById('district').value;
+  const towns = (p && c && d) ? [...new Set(locationConfig.filter(l => l.p===p && l.c===c && l.d===d && l.t).map(l => l.t))].sort() : [];
+  document.getElementById('town').innerHTML = '<option value="">不选</option>' + towns.map(t => `<option value="${t}">${t}</option>`).join('');
+  onTownChange();
+}
+function onTownChange() { lookupRatio(); }
+
+function lookupRatio() {
+  const p = document.getElementById('province').value;
+  const c = document.getElementById('city').value;
+  const d = document.getElementById('district').value;
+  const t = document.getElementById('town').value;
+  let ratio = null, source = '';
+  const find = (pv,cv,dv,tv) => locationConfig.find(l => l.p===(pv||'') && l.c===(cv||'') && l.d===(dv||'') && l.t===(tv||''));
+  let m;
+  if (t && (m = find(p,c,d,t))) { ratio = m.r; source = `乡镇: ${t}`; }
+  else if (d && (m = find(p,c,d,''))) { ratio = m.r; source = `区县: ${d}`; }
+  else if (c && (m = find(p,c,'',''))) { ratio = m.r; source = `地市: ${c}`; }
+  else if (p && (m = find(p,'','',''))) { ratio = m.r; source = `省份: ${p}`; }
+  if (ratio !== null) {
+    document.getElementById('capacityRatio').value = ratio;
+    document.getElementById('ratioSource').value = source;
+  } else {
+    document.getElementById('ratioSource').value = '手动输入';
+  }
+  calcACPower();
+}
+
+// ============ 功率计算 ============
+function calcDCPower() {
+  const watt = parseFloat(document.getElementById('panelPower').value) || 0;
+  const count = parseInt(document.getElementById('panelCount').value) || 0;
+  const dc = watt * count / 1000;
+  document.getElementById('dcPower').value = dc.toFixed(2);
+  calcACPower();
+}
+function calcACPower() {
+  const dc = parseFloat(document.getElementById('dcPower').value) || 0;
+  const ratio = parseFloat(document.getElementById('capacityRatio').value) || 1;
+  if (dc > 0 && ratio > 0) {
+    document.getElementById('acPower').value = (dc / ratio).toFixed(2);
+    document.getElementById('acFormula').value = dc.toFixed(2) + ' / ' + ratio;
+  } else {
+    document.getElementById('acPower').value = '—';
+    document.getElementById('acFormula').value = '—';
+  }
+}
+
+// ============ 台数规则 ============
+function getInverterCount(pac) {
+  if (pac <= 0) return 0;
+  if (pac <= 55) return 1;
+  if (pac <= 110) return 2;
+  if (pac <= 165) return 3;
+  if (pac <= 220) return 4;
+  if (pac <= 275) return 5;
+  if (pac <= 330) return 6;
+  if (pac <= 385) return 7;
+  if (pac <= 400) return 8;
+  return 0;
+}
+
+function selectPhase(phase) {
+  selectedPhase = phase;
+  document.getElementById('phaseSingle').classList.toggle('active', phase === 'single');
+  document.getElementById('phaseThree').classList.toggle('active', phase === 'three');
+}
+
+// ============ 最优组合算法 ============
+function findOptimalCombination(pac, n) {
+  if (n <= 0 || inverterConfig.length === 0) return null;
+  // 按相位过滤逆变器
+  let phaseFiltered = inverterConfig.filter(m => m.phase === selectedPhase || !m.phase);
+  if (!phaseFiltered.length) phaseFiltered = inverterConfig; // 兜底：无相位匹配则用全部
+  const models = n > 1
+    ? phaseFiltered.filter(m => ![10,15,20].includes(m.power)).map(m => m.power)
+    : phaseFiltered.map(m => m.power);
+  if (!models.length) return null;
+  function* combos(arr, k, start) {
+    if (k === 0) { yield []; return; }
+    for (let i = start; i < arr.length; i++)
+      for (const rest of combos(arr, k-1, i)) yield [arr[i], ...rest];
+  }
+  let bestTotal = Infinity, bestCombo = null;
+  for (const combo of combos(models, n, 0)) {
+    const total = combo.reduce((a,b) => a+b, 0);
+    if (total >= pac && total < bestTotal) { bestTotal = total; bestCombo = [...combo]; }
+  }
+  if (!bestCombo) return null;
+  bestCombo.sort((a,b) => a-b);
+  return { total: bestTotal, count: bestCombo.length, combo: bestCombo };
+}
+
+// ============ 选型规则查找 ============
+function lookupRule(pac) {
+  for (const r of rulesConfig) if (pac > r.pMin && pac <= r.pMax) return r;
+  let best = null;
+  for (const r of rulesConfig) if (pac > r.pMax && (!best || r.pMax > best.pMax)) best = r;
+  return best;
+}
+
+// ============ 主计算 ============
+function calculateInverter() {
+  const dcPower = parseFloat(document.getElementById('dcPower').value);
+  const acPower = parseFloat(document.getElementById('acPower').value);
+  if (!selectedPhase) { alert('请先选择接入相数（单相 / 三相）'); return; }
+  if (isNaN(acPower) || acPower <= 0) { alert('请先完成直流侧功率和容配比设置'); return; }
+  if (acPower > 400) { alert('P(交流侧) 超出支持范围（最大 400 kW）'); return; }
+  if (!rulesConfig.length) { alert('逆变器选型规则表为空'); return; }
+  if (!inverterConfig.length) { alert('逆变器型号库为空'); return; }
+
+  // 检查所选相数是否有对应逆变器
+  const phaseMatch = inverterConfig.filter(m => m.phase === selectedPhase || !m.phase);
+  if (!phaseMatch.length) {
+    alert(`当前逆变器型号库中没有${selectedPhase==='single'?'单相':'三相'}逆变器，请先通过管理员配置添加`); return;
+  }
+
+  const rule = lookupRule(acPower);
+  const n = getInverterCount(acPower);
+  const opt = findOptimalCombination(acPower, n);
+
+  // ---- P 功率 ----
+  document.getElementById('rp-dcPower').textContent = dcPower.toFixed(2);
+  document.getElementById('rp-acPower').textContent = acPower.toFixed(2);
+
+  // ---- 规则匹配结果：单相时隐藏 ----
+  const ruleSection = document.getElementById('ruleMatchSection');
+  if (selectedPhase === 'single') {
+    ruleSection.style.display = 'none';
+  } else {
+    ruleSection.style.display = 'block';
+    document.getElementById('r-maxInv').textContent   = rule ? rule.maxInvPower : '—';
+    document.getElementById('r-recCap').textContent   = rule ? rule.recCapacity : '—';
+    document.getElementById('r-recCombo').textContent = (rule && rule.combo) ? rule.combo : '—';
+  }
+
+  // ---- 最优匹配结果 ----
+  const optBox = document.getElementById('optimalBox');
+  const optText = document.getElementById('optimalText');
+  if (opt) {
+    optBox.style.display = 'block';
+    const names = opt.combo.map(p => { const m = phaseMatch.find(iv => iv.power === p) || inverterConfig.find(iv => iv.power === p); return m ? m.model : p+'kW'; });
+    document.getElementById('r-optCap').textContent = opt.total;
+    document.getElementById('r-optCombo').textContent = names.join(' + ');
+    optText.innerHTML =
+      `逆变器台数: ${opt.count} 台<br>` +
+      `最优总功率: <strong>${opt.total} kW</strong>（≥ P(AC) ${acPower.toFixed(2)} kW）<br>` +
+      `组合方案: <strong>${names.join(' + ')}</strong>` +
+      (n > 1 ? '<br><span style="font-size:11px;color:#888780;">（多台已排除 10/15/20kW 型号）</span>' : '');
+  } else {
+    document.getElementById('r-optCap').textContent = '—';
+    document.getElementById('r-optCombo').textContent = '—';
+    optBox.style.display = 'block';
+    optText.innerHTML = `当前${selectedPhase==='single'?'单相':'三相'}逆变器型号库无法满足该 P(AC) 要求，请检查配置`;
+  }
+
+  showResultPage();
+}
+
+// ============ 管理员面板展开 ============
+function toggleAdmin() {
+  document.getElementById('adminPanel').classList.toggle('show');
+  document.getElementById('adminToggle').classList.toggle('open');
+}
+
+// ============ 在线新增 ============
+function showAddForm(type) {
+  ['panel','location','inverter','rules'].forEach(t => { if(t!==type) cancelAdd(t); });
+  document.getElementById('addForm-'+type).classList.toggle('show');
+}
+function cancelAdd(type) {
+  document.getElementById('addForm-'+type).classList.remove('show');
+  const ids = {
+    panel: ['add-panel-watt'],
+    location: ['add-loc-p','add-loc-c','add-loc-d','add-loc-t','add-loc-r'],
+    inverter: ['add-inv-model','add-inv-power','add-inv-phase'],
+    rules: ['add-rules-pmin','add-rules-pmax','add-rules-max','add-rules-rec','add-rules-combo']
+  };
+  (ids[type]||[]).forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+}
+function nextId(arr) { return arr.reduce((m,i) => Math.max(m, i.id||0), 0) + 1; }
+
+function addRow(type) {
+  switch(type) {
+    case 'panel': {
+      const w = parseInt(document.getElementById('add-panel-watt').value);
+      if (!w || w<=0) { alert('请输入有效的组件功率(W)'); return; }
+      panelConfig.push({ id: nextId(panelConfig), watt: w }); break;
+    }
+    case 'location': {
+      const p=document.getElementById('add-loc-p').value.trim();
+      const c=document.getElementById('add-loc-c').value.trim();
+      const d=document.getElementById('add-loc-d').value.trim();
+      const t=document.getElementById('add-loc-t').value.trim();
+      const r=parseFloat(document.getElementById('add-loc-r').value);
+      if (!p&&!c&&!d&&!t) { alert('请至少填写一项地区信息'); return; }
+      if (isNaN(r)||r<=0) { alert('请输入有效容配比（大于0）'); return; }
+      locationConfig.push({ id: nextId(locationConfig), p, c, d, t, r }); break;
+    }
+    case 'inverter': {
+      const model=document.getElementById('add-inv-model').value.trim();
+      const power=parseInt(document.getElementById('add-inv-power').value);
+      const phase=document.getElementById('add-inv-phase').value;
+      if (!model) { alert('请输入型号名称'); return; }
+      if (!power||power<=0) { alert('请输入有效额定功率'); return; }
+      inverterConfig.push({ id: nextId(inverterConfig), model, power, phase }); break;
+    }
+    case 'rules': {
+      const pMin=parseInt(document.getElementById('add-rules-pmin').value);
+      const pMax=parseInt(document.getElementById('add-rules-pmax').value);
+      const maxInv=parseInt(document.getElementById('add-rules-max').value);
+      const recCap=parseInt(document.getElementById('add-rules-rec').value);
+      const combo=document.getElementById('add-rules-combo').value.trim();
+      if (isNaN(pMin)||isNaN(pMax)||pMin>=pMax) { alert('请输入有效 P（交流侧）范围（下限 < 上限）'); return; }
+      if (isNaN(maxInv)||maxInv<=0) { alert('请输入有效逆变器总功率'); return; }
+      if (isNaN(recCap)||recCap<=0) { alert('请输入有效建议备案容量'); return; }
+      rulesConfig.push({ id: nextId(rulesConfig), pMin, pMax, maxInvPower: maxInv, recCapacity: recCap, combo }); break;
+    }
+  }
+  saveLocalCache();
+  cancelAdd(type);
+  refreshAll();
+}
+
+// ============ 在线删除 ============
+function deleteRow(type, id) {
+  if (!confirm('确定删除这条记录？')) return;
+  const maps = { panel: 'panelConfig', location: 'locationConfig', inverter: 'inverterConfig', rules: 'rulesConfig' };
+  const key = maps[type];
+  if (key === 'panelConfig')    panelConfig    = panelConfig.filter(i => i.id !== id);
+  if (key === 'locationConfig') locationConfig = locationConfig.filter(i => i.id !== id);
+  if (key === 'inverterConfig') inverterConfig = inverterConfig.filter(i => i.id !== id);
+  if (key === 'rulesConfig')    rulesConfig    = rulesConfig.filter(i => i.id !== id);
+  saveLocalCache();
+  refreshAll();
+}
+
+// ============ xlsx 导入：覆盖模式（完全替换） ============
+function importXlsxOverwrite(target) {
+  importTarget = target;
+  importMode = 'overwrite';
+  const fi = document.getElementById('fileInput');
+  fi.value = '';
+  fi.click();
+}
+
+// ============ xlsx 导入：更新模式（相同覆盖，新增追加） ============
+function importXlsxUpdate(target) {
+  importTarget = target;
+  importMode = 'update';
+  const fi = document.getElementById('fileInput');
+  fi.value = '';
+  fi.click();
+}
+
+function handleFileImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      if (!rows.length) { alert('表格为空'); return; }
+      let newRows = [];
+      switch(importTarget) {
+        case 'panel': {
+          newRows = rows.map((r,i) => ({
+            id: 0, watt: parseInt(r['组件功率(W)'] || r['watt'] || r['W'] || 0)
+          })).filter(r => r.watt > 0);
+          break;
+        }
+        case 'location': {
+          newRows = rows.map((r,i) => ({
+            id: 0, p: String(r['省']||''), c: String(r['市']||''), d: String(r['区县']||''),
+            t: String(r['乡镇']||''), r: parseFloat(r['容配比上限']||r['ratio']||0)
+          }));
+          break;
+        }
+        case 'inverter': {
+          newRows = rows.map((r,i) => {
+            const ph = String(r['相数']||r['phase']||'three').trim();
+            return {
+              id: 0,
+              model: String(r['型号名称']||r['model']||''),
+              power: parseInt(r['额定功率(kW)']||r['power']||r['kW']||0),
+              phase: (ph === '单相' || ph === 'single') ? 'single' : 'three'
+            };
+          }).filter(r => r.model && r.power > 0);
+          break;
+        }
+        case 'rules': {
+          newRows = rows.map((r,i) => {
+            const rangeStr = String(r['P范围']||r['P（交流侧）范围']||r['range']||'0-0');
+            const nums = rangeStr.match(/\d+/g)||[0,0];
+            return {
+              id: 0, pMin: parseInt(nums[0])||0, pMax: parseInt(nums[1])||0,
+              maxInvPower: parseInt(r['逆变器总功率']||r['maxInvPower']||0),
+              recCapacity: parseInt(r['建议备案容量']||r['recCapacity']||0),
+              combo: String(r['建议组合']||r['combo']||'')
+            };
+          }).filter(r => r.pMax > r.pMin);
+          break;
+        }
+      }
+
+      if (!newRows.length) { alert('未能解析到有效数据，请检查表格格式'); return; }
+
+      if (importMode === 'overwrite') {
+        // 完全覆盖
+        const baseId = 1;
+        newRows.forEach((r, i) => r.id = baseId + i);
+        if (importTarget === 'panel') panelConfig = newRows;
+        else if (importTarget === 'location') locationConfig = newRows;
+        else if (importTarget === 'inverter') inverterConfig = newRows;
+        else if (importTarget === 'rules') rulesConfig = newRows;
+        saveLocalCache();
+        refreshAll();
+        alert(`导入成功！已完全覆盖为 ${newRows.length} 条记录\n（记得点"保存并同步"推送到云端）`);
+      } else if (importMode === 'update') {
+        // 更新模式：相同内容覆盖，新内容新增
+        let updated = 0, added = 0;
+        if (importTarget === 'panel') {
+          newRows.forEach(nr => {
+            const existIdx = panelConfig.findIndex(p => p.watt === nr.watt);
+            if (existIdx >= 0) { panelConfig[existIdx].watt = nr.watt; updated++; }
+            else { nr.id = nextId(panelConfig); panelConfig.push(nr); added++; }
+          });
+        } else if (importTarget === 'location') {
+          newRows.forEach(nr => {
+            const existIdx = locationConfig.findIndex(l =>
+              l.p === nr.p && l.c === nr.c && l.d === nr.d && l.t === nr.t);
+            if (existIdx >= 0) { locationConfig[existIdx].r = nr.r; updated++; }
+            else { nr.id = nextId(locationConfig); locationConfig.push(nr); added++; }
+          });
+        } else if (importTarget === 'inverter') {
+          newRows.forEach(nr => {
+            const existIdx = inverterConfig.findIndex(m => m.model === nr.model);
+            if (existIdx >= 0) { inverterConfig[existIdx].power = nr.power; inverterConfig[existIdx].phase = nr.phase; updated++; }
+            else { nr.id = nextId(inverterConfig); inverterConfig.push(nr); added++; }
+          });
+        } else if (importTarget === 'rules') {
+          newRows.forEach(nr => {
+            const existIdx = rulesConfig.findIndex(rr => rr.pMin === nr.pMin && rr.pMax === nr.pMax);
+            if (existIdx >= 0) {
+              rulesConfig[existIdx].maxInvPower = nr.maxInvPower;
+              rulesConfig[existIdx].recCapacity = nr.recCapacity;
+              rulesConfig[existIdx].combo = nr.combo;
+              updated++;
+            } else { nr.id = nextId(rulesConfig); rulesConfig.push(nr); added++; }
+          });
+        }
+        saveLocalCache();
+        refreshAll();
+        alert(`更新成功！覆盖 ${updated} 条，新增 ${added} 条\n（记得点"保存并同步"推送到云端）`);
+      }
+    } catch(err) {
+      alert('文件解析失败: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value = '';
+}
+
+// ============ xlsx 导出 ============
+function exportXlsx(target) {
+  let data = [], sheetName = '', filename = '';
+  switch(target) {
+    case 'panel':
+      data = panelConfig.map(p => ({ '组件功率(W)': p.watt }));
+      sheetName = '组件功率'; filename = '组件功率配置表.xlsx'; break;
+    case 'location':
+      data = locationConfig.map(l => ({ '省': l.p, '市': l.c, '区县': l.d, '乡镇': l.t, '容配比上限': l.r }));
+      sheetName = '地区容配比'; filename = '地区容配比配置表.xlsx'; break;
+    case 'inverter':
+      data = inverterConfig.map(m => ({ '型号名称': m.model, '额定功率(kW)': m.power, '相数': m.phase==='single'?'单相':'三相' }));
+      sheetName = '逆变器型号库'; filename = '逆变器型号库.xlsx'; break;
+    case 'rules':
+      data = rulesConfig.map(rr => ({ 'P（交流侧）范围': `${rr.pMin}＜P≤${rr.pMax}`, '逆变器总功率': rr.maxInvPower, '建议备案容量': rr.recCapacity, '建议组合': rr.combo }));
+      sheetName = '选型规则'; filename = '逆变器选型规则表.xlsx'; break;
+  }
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, filename);
+}
+
+// ============ 启动 ============
+(async function init() {
+  applyRole();
+  await loadFromCloud();
+})();
+</script>
+</body>
+</html>
