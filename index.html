@@ -309,10 +309,8 @@
             </div>
           </div>
           <div class="hint" style="margin-top:6px;font-size:10px;line-height:1.6;">
-            📋 <strong>首次配置 2 步走：</strong><br>
-            ① <a href="https://github.com/settings/tokens/new?scopes=gist&description=pv-inverter-config" target="_blank">创建 GitHub Token</a> → Expiration 选「No expiration」→ 勾选 <code>gist</code> 权限 → 生成后粘贴到上方<br>
-            ② 点击「<strong>创建Gist</strong>」自动生成 Gist ID<br>
-            ⚡ 用户端无需任何配置，打开页面即自动加载云端数据。
+            📋 Gist ID 已预置，<strong>所有设备打开页面即自动加载云端最新配置</strong>，无需任何操作。<br>
+            🔧 如需更换同步目标，管理员重新点击「创建Gist」即可覆盖。
           </div>
         </div>
 
@@ -621,7 +619,8 @@ const ADMIN_PWD = 'admin888';
 let gistReady = false;
 
 function getGistToken() { return localStorage.getItem('pv_gist_token') || ''; }
-function getGistId()    { return localStorage.getItem('pv_gist_id')  || ''; }
+const FIXED_GIST_ID = '4df13dc5ecea099b828a33b37f7b1595'; // 所有设备统一使用此 Gist，无需手动配置
+function getGistId()    { return localStorage.getItem('pv_gist_id')  || FIXED_GIST_ID; }
 
 function saveGistSettings() {
   localStorage.setItem('pv_gist_token', document.getElementById('gistToken').value.trim());
