@@ -173,8 +173,8 @@
       background: #F5F5F3; border-radius: 10px; padding: 12px 14px; text-align: center;
     }
     .power-item .plabel { font-size: 11px; color: #888780; margin-bottom: 4px; }
-    .power-item .pvalue { font-size: 24px; font-weight: 500; color: #2C2C2A; }
-    .power-item .punit { font-size: 11px; color: #888780; margin-top: 2px; }
+    .power-item .pvalue { font-size: 16px; font-weight: 500; color: #2C2C2A; }
+    .power-item .pvalue .punit { font-size: 12px; font-weight: 400; color: #888780; margin-left: 2px; }
 
     /* 管理员配置面板 */
     .admin-toggle {
@@ -487,13 +487,11 @@
     <div class="power-row">
       <div class="power-item">
         <div class="plabel">P（直流侧）</div>
-        <div class="pvalue" id="rp-dcPower">—</div>
-        <div class="punit">kWp</div>
+        <div class="pvalue" id="rp-dcPower">— <span class="punit">kWp</span></div>
       </div>
       <div class="power-item">
         <div class="plabel">P（交流侧）</div>
-        <div class="pvalue" id="rp-acPower">—</div>
-        <div class="punit">kW</div>
+        <div class="pvalue" id="rp-acPower">— <span class="punit">kW</span></div>
       </div>
     </div>
 
@@ -1016,8 +1014,8 @@ function calculateInverter() {
   const opt = findOptimalCombination(acPower, n);
 
   // ---- P 功率 ----
-  document.getElementById('rp-dcPower').textContent = dcPower.toFixed(2);
-  document.getElementById('rp-acPower').textContent = acPower.toFixed(2);
+  document.getElementById('rp-dcPower').innerHTML = dcPower.toFixed(2) + ' <span class="punit">kWp</span>';
+  document.getElementById('rp-acPower').innerHTML = acPower.toFixed(2) + ' <span class="punit">kW</span>';
 
   // ---- 规则匹配结果：单相时隐藏 ----
   const ruleSection = document.getElementById('ruleMatchSection');
